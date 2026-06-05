@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>Causeway MR Report: Lipid → CAD (BioBank Japan)</title>
+<style>
+  body { font-family: "Noto Serif", Georgia, serif; max-width: 860px; margin: 40px auto; padding: 0 24px; line-height: 1.7; color: #1a1a1a; }
+  h1 { font-size: 1.8em; border-bottom: 2px solid #333; padding-bottom: 8px; }
+  h2 { font-size: 1.3em; border-bottom: 1px solid #ccc; margin-top: 2em; }
+  h3 { font-size: 1.1em; }
+  table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+  th, td { border: 1px solid #bbb; padding: 6px 10px; text-align: left; }
+  th { background: #f4f4f4; }
+  code { background: #f4f4f4; padding: 2px 4px; border-radius: 3px; font-size: 0.9em; }
+  blockquote { border-left: 3px solid #ccc; margin-left: 0; padding-left: 16px; color: #555; }
+  @page { margin: 2cm; }
+</style>
+</head>
+<body>
+<p>The scientific report has been generated and saved to <code>causeway_mr_scientific_report.md</code>. Here is the complete structured report:</p>
+<hr />
+<h1 id="ldl-c-causes-cad-in-east-asians">LDL-C Causes CAD in East Asians</h1>
+<h2 id="abstract">Abstract</h2>
+<p><strong>Background:</strong> Lipid traits are established causal risk factors for coronary artery disease (CAD) in European populations, but evidence in East Asians remains limited.</p>
+<p><strong>Methods:</strong> We conducted two-sample Mendelian randomization (MR) using genome-wide significant genetic instruments for five lipid traits (LDL-cholesterol, HDL-cholesterol, triglycerides, total cholesterol, and non-HDL-cholesterol) from East Asian GWAS and CAD outcomes from BioBank Japan (29,319 cases; 183,134 controls). Primary analysis used inverse-variance weighted (IVW) estimation. Sensitivity analyses included weighted median, MR-Egger regression, MR-PRESSO, Cochran's Q heterogeneity test, and Steiger directionality filtering.</p>
+<p><strong>Results:</strong> All five lipid traits demonstrated significant causal associations with CAD. LDL-cholesterol showed a strong deleterious effect (OR=1.695, 95% CI: 1.465–1.961, P=1.32×10⁻¹²), as did non-HDL-cholesterol (OR=1.726, 95% CI: 1.528–1.950, P=1.65×10⁻¹⁸). HDL-cholesterol was protective (OR=0.795, 95% CI: 0.723–0.875, P=2.65×10⁻⁶). Triglycerides (OR=1.165, 95% CI: 1.082–1.254, P=5.27×10⁻⁵) and total cholesterol (OR=1.566, 95% CI: 1.415–1.732, P=3.41×10⁻¹⁸) were also deleterious. No directional pleiotropy was detected (all Egger intercept P&gt;0.30). Steiger filtering confirmed correct causal direction for all exposures.</p>
+<p><strong>Conclusions:</strong> This MR analysis provides strong genetic evidence that LDL-C and non-HDL-C causally increase CAD risk in East Asians, with effect magnitudes comparable to European populations. These findings support lipid-lowering therapies for CAD prevention across ancestries.</p>
+<p><strong>Word count:</strong> 248</p>
+<hr />
+<h2 id="1-introduction">1. Introduction</h2>
+<p>Coronary artery disease (CAD) remains a leading cause of morbidity and mortality worldwide, including in East Asian populations where its incidence has risen substantially over recent decades [R1]. While lifestyle and environmental factors contribute to CAD risk, genetic studies have established lipid traits—particularly low-density lipoprotein cholesterol (LDL-C)—as key causal risk factors [R2].</p>
+<p>Mendelian randomization (MR) leverages genetic variants as instrumental variables to infer causal relationships between exposures and outcomes, minimizing confounding and reverse causation bias inherent to observational studies [R3]. Large-scale MR studies in European populations have consistently demonstrated that genetically elevated LDL-C increases CAD risk, providing robust support for lipid-lowering therapies [R4, R5]. However, the generalizability of these findings to East Asian populations has been questioned due to differences in genetic architecture, lipid metabolism, dietary patterns, and baseline disease prevalence [R6].</p>
+<p>BioBank Japan (BBJ) represents the largest biobank of East Asian individuals, providing unprecedented power for genetic epidemiology in this population. The Causeway pipeline integrates BBJ GWAS data with established MR methods to systematically evaluate causal relationships. No large-scale East-Asian-specific MR study has comprehensively examined multiple lipid fractions and CAD using this resource with rigorous sensitivity analyses.</p>
+<p>This study aims to: (1) estimate causal effects of five lipid traits on CAD in East Asians using BioBank Japan data; (2) conduct comprehensive sensitivity analyses to assess robustness; and (3) compare findings with established European MR evidence.</p>
+<hr />
+<h2 id="2-methods-summary">2. Methods Summary</h2>
+<h3 id="21-study-design">2.1 Study Design</h3>
+<p>Two-sample Mendelian randomization was performed using the Causeway pipeline, which integrates genetic instruments from East Asian lipid GWAS with CAD outcome data from BioBank Japan (29,319 cases; 183,134 controls).</p>
+<h3 id="22-exposures">2.2 Exposures</h3>
+<p>Five lipid traits were evaluated: LDL-cholesterol (LDL-C), HDL-cholesterol (HDL-C), Log-transformed triglycerides (logTG), Total cholesterol (TC), and Non-HDL-cholesterol (non-HDL-C).</p>
+<h3 id="23-genetic-instruments">2.3 Genetic Instruments</h3>
+<p>Instruments were selected based on genome-wide significance (P&lt;5×10⁻⁸) from East Asian lipid GWAS. Instrument counts ranged from 49 (LDL-C, logTG) to 108 (TC) for TwoSampleMR analyses.</p>
+<h3 id="24-primary-analysis">2.4 Primary Analysis</h3>
+<p>Inverse-variance weighted (IVW) random-effects meta-analysis served as the primary method.</p>
+<h3 id="25-sensitivity-analyses">2.5 Sensitivity Analyses</h3>
+<p>Weighted Median, MR-Egger Regression, MR-PRESSO, Cochran's Q and I², and Steiger Filtering.</p>
+<hr />
+<h2 id="3-results">3. Results</h2>
+<h3 id="31-primary-ivw-estimates">3.1 Primary IVW Estimates</h3>
+<table>
+<thead>
+<tr>
+<th>Exposure</th>
+<th>OR (95% CI)</th>
+<th>P-value</th>
+<th>N Instruments</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LDL-C</td>
+<td>1.695 (1.465–1.961)</td>
+<td>1.32×10⁻¹²</td>
+<td>49</td>
+</tr>
+<tr>
+<td>non-HDL-C</td>
+<td>1.726 (1.528–1.950)</td>
+<td>1.65×10⁻¹⁸</td>
+<td>85</td>
+</tr>
+<tr>
+<td>TC</td>
+<td>1.566 (1.415–1.732)</td>
+<td>3.41×10⁻¹⁸</td>
+<td>108</td>
+</tr>
+<tr>
+<td>logTG</td>
+<td>1.165 (1.082–1.254)</td>
+<td>5.27×10⁻⁵</td>
+<td>49</td>
+</tr>
+<tr>
+<td>HDL-C</td>
+<td>0.795 (0.723–0.875)</td>
+<td>2.65×10⁻⁶</td>
+<td>106</td>
+</tr>
+</tbody>
+</table>
+<h3 id="32-sensitivity-analysis-summary">3.2 Sensitivity Analysis Summary</h3>
+<table>
+<thead>
+<tr>
+<th>Exposure</th>
+<th>Weighted Median OR</th>
+<th>MR-Egger OR</th>
+<th>Egger Intercept P</th>
+<th>I² (%)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LDL-C</td>
+<td>1.494</td>
+<td>1.531</td>
+<td>0.356</td>
+<td>87.3</td>
+</tr>
+<tr>
+<td>non-HDL-C</td>
+<td>1.610</td>
+<td>1.648</td>
+<td>0.631</td>
+<td>86.1</td>
+</tr>
+<tr>
+<td>TC</td>
+<td>1.496</td>
+<td>1.702</td>
+<td>0.360</td>
+<td>79.1</td>
+</tr>
+<tr>
+<td>logTG</td>
+<td>1.137</td>
+<td>1.128</td>
+<td>0.515</td>
+<td>66.5</td>
+</tr>
+<tr>
+<td>HDL-C</td>
+<td>0.869</td>
+<td>0.848</td>
+<td>0.306</td>
+<td>86.8</td>
+</tr>
+</tbody>
+</table>
+<h3 id="33-literature-context">3.3 Literature Context</h3>
+<p>No large-scale East-Asian-specific MR study identified. Kim et al. reported drug target MR findings; Hayashi et al. conducted cross-ancestry MR; a remnant cholesterol study used BBJ outcomes.</p>
+<hr />
+<h2 id="4-discussion">4. Discussion</h2>
+<h3 id="41-interpretation">4.1 Interpretation</h3>
+<p>Strong genetic evidence for LDL-C and non-HDL-C causally increasing CAD risk in East Asians (OR≈1.7). Consistency across MR methods strengthens causal inference.</p>
+<h3 id="42-comparison-with-european-mr-studies">4.2 Comparison with European MR Studies</h3>
+<p>Findings broadly consistent with European evidence [R1–R6]. LDL-C effect size (OR=1.695) comparable to European estimates (OR 1.5–2.0).</p>
+<h3 id="43-limitations">4.3 Limitations</h3>
+<p>Substantial heterogeneity (I²=67–87%), MR-PRESSO outliers detected, potential sample overlap, winner's curse, generalizability limited to Japanese.</p>
+<hr />
+<h2 id="5-conclusion">5. Conclusion</h2>
+<p>This MR analysis demonstrates that genetically elevated LDL-C and non-HDL-C causally increase CAD risk in East Asians, with effect magnitudes comparable to European studies. These findings support lipid-lowering therapies across ancestries.</p>
+<hr />
+<h2 id="6-references">6. References</h2>
+<h3 id="european-lipid-cad-mr-references">European Lipid-CAD MR References</h3>
+<p>[R1] Holmes MV, et al. Eur Heart J. 2015;36(9):539-550.
+[R2] Ference BA, et al. J Am Coll Cardiol. 2012;60(25):2631-2639.
+[R3] Do R, et al. Nat Genet. 2013;45(11):1345-1352.
+[R4] Burgess S, et al. JAMA. 2018;319(15):1545-1556.
+[R5] Voight BF, et al. Lancet. 2012;380(9841):572-580.
+[R6] Richardson TG, et al. PLoS Med. 2020;17(3):e1003062.</p>
+<h3 id="east-asian-literature">East Asian Literature</h3>
+<p>No large-scale East-Asian-specific MR study with comprehensive lipid-CAD effect estimates meeting all gate criteria was identified.</p>
+</body>
+</html>

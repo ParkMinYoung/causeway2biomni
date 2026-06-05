@@ -269,6 +269,8 @@ def render_pdf(report_md_path: Path, output_path: Path, title: str):
             "  Install: pip install weasyprint",
             file=sys.stderr,
         )
+    except Exception as e:
+        print(f"[render_pdf] WeasyPrint error ({e}) — HTML saved to {html_path}", file=sys.stderr)
 
 
 def update_symlinks(output_base: Path, run_dir: Path, name: str):
