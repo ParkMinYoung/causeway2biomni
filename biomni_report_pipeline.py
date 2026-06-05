@@ -7,10 +7,16 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import sys
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+
+
+def extract_solution(text: str) -> str:
+    match = re.search(r"<solution>(.*?)</solution>", text, re.DOTALL)
+    return match.group(1).strip() if match else text.strip()
 
 
 @dataclass
@@ -20,7 +26,7 @@ class AnalysisConfig:
     output_base: Path
     purpose: str
     pdf_title: str
-    llm_model: str = "claude-opus-4-5"
+    llm_model: str = "claude-sonnet-4-5"
     analysis_prompt: str | None = None
     literature_prompt: str | None = None
     report_instructions: str | None = None
@@ -76,8 +82,6 @@ def create_cached_agent(config: AnalysisConfig):
 
 
 def stream_and_capture(agent, prompt: str, label: str) -> str:
-    from biomni.utils import extract_solution
-
     seen: set[str] = set()
     all_chunks: list[str] = []
     step = 0
@@ -167,7 +171,6 @@ def run_stage_2(agent, ctx: RunContext, config: AnalysisConfig) -> str:
         ctx.save_stage("02_literature.md", cached)
         return cached
     print("[Stage 2] Searching literature...", flush=True)
-    from biomni.utils import extract_solution
     _, raw = agent.go(config.literature_prompt)
     result = extract_solution(raw)
     ctx.save_cached("literature", key, result)
@@ -206,7 +209,6 @@ def run_stage_3(agent, ctx: RunContext, config: AnalysisConfig, lit_text: str) -
         ctx.save_stage("03_report.md", cached)
         return cached
     print("[Stage 3] Writing report...", flush=True)
-    from biomni.utils import extract_solution
     prompt = _build_report_prompt(config, lit_text)
     _, raw = agent.go(prompt)
     result = extract_solution(raw)

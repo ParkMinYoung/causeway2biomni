@@ -8,7 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from biomni_report_pipeline import AnalysisConfig, run_pipeline
 
-LLM_MODEL = "claude-opus-4-5"
+LLM_MODEL = "claude-sonnet-4-5"
 
 ANALYSIS_PROMPT = """
 You are a Mendelian randomization expert. Analyze the Causeway MR results in the loaded data file.
@@ -124,7 +124,7 @@ def main():
 
     config = AnalysisConfig(
         name="causeway_mr",
-        data_path=str(csv_path.parent),
+        data_path="/home/adminrig/src/Biomni/data",
         output_base=Path("result"),
         purpose="BioBank Japan Mendelian randomization: lipid traits → coronary artery disease",
         pdf_title="Causeway MR Report: Lipid → CAD (BioBank Japan)",

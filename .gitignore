@@ -1,7 +1,10 @@
 data/
+result/
 *.parquet
 *.pdf
 *.csv
+*.md.bak
 __pycache__/
 *.pyc
 .env
+causeway_mr_scientific_report.md
