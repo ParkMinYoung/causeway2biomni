@@ -33,6 +33,18 @@ class AnalysisConfig:
     csv_path: Path | None = None
 
 
+PRICE_PER_TOKEN = {
+    "input_tokens":                 3.00 / 1_000_000,
+    "output_tokens":               15.00 / 1_000_000,
+    "cache_creation_input_tokens":  3.75 / 1_000_000,
+    "cache_read_input_tokens":      0.30 / 1_000_000,
+}
+
+
+def compute_cost(usage: dict) -> float:
+    return sum(usage.get(k, 0) * v for k, v in PRICE_PER_TOKEN.items())
+
+
 class RunContext:
     def __init__(self, output_base: Path, csv_path: Path | None = None):
         self.run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -41,6 +53,12 @@ class RunContext:
         self.run_dir.mkdir(parents=True)
         self.cache_dir.mkdir(exist_ok=True)
         self.csv_bytes = csv_path.read_bytes() if csv_path and csv_path.exists() else b""
+        self.usage: dict = {
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "cache_creation_input_tokens": 0,
+            "cache_read_input_tokens": 0,
+        }
 
     def compute_hash(self, inputs: list) -> str:
         h = hashlib.sha256()
@@ -59,6 +77,12 @@ class RunContext:
         p = self.run_dir / filename
         p.write_text(content, encoding="utf-8")
         return p
+
+    def accumulate_usage(self, usage_raw):
+        if not isinstance(usage_raw, dict):
+            return
+        for k in self.usage:
+            self.usage[k] += usage_raw.get(k, 0)
 
     def save_metadata(self, data: dict):
         (self.run_dir / "00_metadata.json").write_text(
@@ -81,7 +105,7 @@ def create_cached_agent(config: AnalysisConfig):
     return agent
 
 
-def stream_and_capture(agent, prompt: str, label: str) -> str:
+def stream_and_capture(agent, prompt: str, label: str, ctx: "RunContext | None" = None) -> str:
     seen: set[str] = set()
     all_chunks: list[str] = []
     step = 0
@@ -94,6 +118,8 @@ def stream_and_capture(agent, prompt: str, label: str) -> str:
             step += 1
             print(f"\n--- [{label}] Step {step} ---")
             print("\n".join(new), flush=True)
+        if ctx and "usage" in chunk:
+            ctx.accumulate_usage(chunk["usage"])
     return extract_solution("\n".join(all_chunks))
 
 
@@ -158,7 +184,7 @@ def run_stage_1(agent, ctx: RunContext, config: AnalysisConfig) -> str:
         ctx.save_stage("01_analysis.md", cached)
         return cached
     print("[Stage 1] Running analysis...", flush=True)
-    result = stream_and_capture(agent, config.analysis_prompt, "ANALYSIS")
+    result = stream_and_capture(agent, config.analysis_prompt, "ANALYSIS", ctx)
     ctx.save_cached("analysis", key, result)
     ctx.save_stage("01_analysis.md", result)
     return result
@@ -171,7 +197,8 @@ def run_stage_2(agent, ctx: RunContext, config: AnalysisConfig) -> str:
         ctx.save_stage("02_literature.md", cached)
         return cached
     print("[Stage 2] Searching literature...", flush=True)
-    _, raw = agent.go(config.literature_prompt)
+    usage_raw, raw = agent.go(config.literature_prompt)
+    ctx.accumulate_usage(usage_raw)
     result = extract_solution(raw)
     ctx.save_cached("literature", key, result)
     ctx.save_stage("02_literature.md", result)
@@ -210,7 +237,8 @@ def run_stage_3(agent, ctx: RunContext, config: AnalysisConfig, lit_text: str) -
         return cached
     print("[Stage 3] Writing report...", flush=True)
     prompt = _build_report_prompt(config, lit_text)
-    _, raw = agent.go(prompt)
+    usage_raw, raw = agent.go(prompt)
+    ctx.accumulate_usage(usage_raw)
     result = extract_solution(raw)
     ctx.save_cached("report", key, result)
     ctx.save_stage("03_report.md", result)
@@ -313,12 +341,22 @@ def run_pipeline(config: AnalysisConfig):
     render_pdf(ctx.run_dir / "03_report.md", pdf_path, config.pdf_title)
 
     elapsed = (datetime.now() - t0).total_seconds()
+    cost = compute_cost(ctx.usage)
+    u = ctx.usage
+    print(
+        f"\n[Cost] input={u['input_tokens']:,}  output={u['output_tokens']:,}"
+        f"  cache_read={u['cache_read_input_tokens']:,}  cache_write={u['cache_creation_input_tokens']:,}",
+        flush=True,
+    )
+    print(f"[Cost] Estimated: ${cost:.4f} USD", flush=True)
     ctx.save_metadata({
         "run_id": ctx.run_id,
         "analysis": config.name,
         "model": config.llm_model,
         "elapsed_sec": round(elapsed, 1),
         "stages_cached": [],
+        "token_usage": ctx.usage,
+        "estimated_cost_usd": round(cost, 4),
     })
 
     update_symlinks(config.output_base, ctx.run_dir, config.name)

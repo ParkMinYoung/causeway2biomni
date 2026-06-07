@@ -49,11 +49,13 @@ Based on your understanding, write:
 - Reporting format must require DOI for every cited paper
 - Final instruction: "Do NOT fabricate citations."
 
-**REPORT_INSTRUCTIONS**: Rules for the final report.
-- Title ≤8 words (with correct/incorrect examples)
+**REPORT_INSTRUCTIONS**: Rules for the final report (Korean body text).
+- LANGUAGE RULE: statistical terms/abbreviations in English; all explanatory sentences in Korean (한국어)
+- Section headings: bilingual format — e.g. "1. 초록 (Abstract)"
+- Title ≤8 단어 (with correct/incorrect examples)
 - Citations: use only DOIs verified in the literature results
 - Numerical values must match analysis output exactly (±0.001)
-- Required sections: Abstract → Methods → Results → Discussion → References
+- Required sections: 초록 → 서론 → 방법 요약 → 결과 → 고찰 → 결론 → 참고문헌
 
 ### Step 4: Create the analysis file
 
@@ -92,7 +94,7 @@ def main():
     config = AnalysisConfig(
         name="<name>",
         data_path=str(data_path.parent),
-        output_base=Path("result"),
+        output_base=Path("result") / "<DISPLAY_NAME>",  # e.g. "GWAS_PRS", "Proteomics_AD"
         purpose="<one-line purpose>",
         pdf_title="<PDF title>",
         llm_model=LLM_MODEL,

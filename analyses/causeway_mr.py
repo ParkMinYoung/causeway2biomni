@@ -89,26 +89,31 @@ Do NOT alter numbers. If CI not in abstract, state "CI not reported."
 """
 
 REPORT_INSTRUCTIONS = """
-Write a structured scientific report summarizing the Causeway MR analysis results.
+Causeway MR 분석 결과를 정리한 과학 리포트를 작성하시오.
 
-Required sections:
-1. Abstract (≤250 words)
-2. Introduction (background on lipid-CAD MR, East Asian context)
-3. Methods Summary (MR methods used, sensitivity analyses)
-4. Results
-   - Primary IVW estimates table (all exposures)
-   - Sensitivity analysis summary
-   - Literature context: cite only papers from the verified literature results
-5. Discussion
-   - Interpretation of findings
-   - Comparison with European MR studies (use [R1]–[R6] for European refs)
-   - Limitations
-6. Conclusion
-7. References
-   - [R1]–[R6]: Standard European lipid-CAD MR references (do NOT alter DOI/author/year)
-   - [A1]–[An]: Only papers from the verified East Asian literature search above
+LANGUAGE RULE:
+- Statistical terms, method names, and abbreviations: keep in English (e.g. IVW, MR-Egger, OR, 95% CI, GSMR, HEIDI, SNP, GWAS)
+- All explanatory sentences, interpretations, and conclusions: write in Korean (한국어)
+- Section headings: bilingual — e.g. "1. 초록 (Abstract)"
 
-TITLE RULE: ≤8 words. Correct: "LDL-C Causes CAD in East Asians". Wrong: "Mendelian Randomization Study Investigating the Causal Role of Lipids in Coronary Artery Disease Among East Asian Populations"
+필수 섹션:
+1. 초록 (Abstract, ≤250 단어)
+2. 서론 (Introduction) — 배경: 지질-CAD MR, 동아시아 맥락
+3. 방법 요약 (Methods Summary) — 사용된 MR 기법, 민감도 분석
+4. 결과 (Results)
+   - Primary IVW estimates 표 (전체 노출 변수)
+   - 민감도 분석 요약 표
+   - 문헌 맥락: 검증된 문헌만 인용
+5. 고찰 (Discussion)
+   - 결과 해석
+   - 유럽 MR 연구와 비교 ([R1]–[R6] 사용)
+   - 한계점
+6. 결론 (Conclusion)
+7. 참고문헌 (References)
+   - [R1]–[R6]: 유럽 지질-CAD MR 표준 참고문헌 (DOI/저자/연도 변경 금지)
+   - [A1]–[An]: 검증된 동아시아 문헌 검색 결과 논문만 인용
+
+TITLE RULE: ≤8 단어. 올바른 예) "LDL-C Causes CAD in East Asians". 잘못된 예) "BioBank Japan 데이터를 활용한 동아시아인 지질 형질과 관상동맥질환 간의 멘델 무작위화 연구"
 """
 
 
@@ -125,7 +130,7 @@ def main():
     config = AnalysisConfig(
         name="causeway_mr",
         data_path="/home/adminrig/src/Biomni/data",
-        output_base=Path("result"),
+        output_base=Path("result") / "Causeway_MR",
         purpose="BioBank Japan Mendelian randomization: lipid traits → coronary artery disease",
         pdf_title="Causeway MR Report: Lipid → CAD (BioBank Japan)",
         llm_model=LLM_MODEL,
