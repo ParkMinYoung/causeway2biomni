@@ -46,6 +46,24 @@ def compute_cost(usage: dict) -> float:
     return sum(usage.get(k, 0) * v for k, v in PRICE_PER_TOKEN.items())
 
 
+try:
+    from langchain_core.callbacks import BaseCallbackHandler
+
+    class _UsageTracker(BaseCallbackHandler):
+        def __init__(self, ctx: "RunContext"):
+            self._ctx = ctx
+
+        def on_llm_end(self, response, **kwargs):
+            for gen_list in getattr(response, "generations", []):
+                for gen in gen_list:
+                    meta = getattr(getattr(gen, "message", None), "response_metadata", {})
+                    usage = meta.get("usage", {})
+                    self._ctx.accumulate_usage(usage)
+
+except ImportError:
+    _UsageTracker = None
+
+
 class RunContext:
     def __init__(self, output_base: Path, csv_path: Path | None = None):
         self.run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -104,7 +122,7 @@ def _go_with_retry(agent, prompt: str, max_retries: int = 4):
                 raise
 
 
-def create_cached_agent(config: AnalysisConfig):
+def create_cached_agent(config: AnalysisConfig, ctx: "RunContext | None" = None):
     from biomni.agent import A1
 
     agent = A1(path=config.data_path, llm=config.llm_model, use_tool_retriever=False)
@@ -116,6 +134,10 @@ def create_cached_agent(config: AnalysisConfig):
                 "cache_control": {"type": "ephemeral"},
             }
         ]
+    if ctx is not None and _UsageTracker is not None:
+        tracker = _UsageTracker(ctx)
+        existing = list(agent.llm.callbacks or [])
+        agent.llm.callbacks = existing + [tracker]
     return agent
 
 
@@ -132,8 +154,6 @@ def stream_and_capture(agent, prompt: str, label: str, ctx: "RunContext | None" 
             step += 1
             print(f"\n--- [{label}] Step {step} ---")
             print("\n".join(new), flush=True)
-        if ctx and "usage" in chunk:
-            ctx.accumulate_usage(chunk["usage"])
     return extract_solution("\n".join(all_chunks))
 
 
@@ -212,8 +232,7 @@ def run_stage_2(agent, ctx: RunContext, config: AnalysisConfig) -> str:
         ctx.save_stage("02_literature.md", cached)
         return cached
     print("[Stage 2] Searching literature...", flush=True)
-    usage_raw, raw = _go_with_retry(agent, config.literature_prompt)
-    ctx.accumulate_usage(usage_raw)
+    _, raw = _go_with_retry(agent, config.literature_prompt)
     result = extract_solution(raw)
     ctx.save_cached("literature", key, result)
     ctx.save_stage("02_literature.md", result)
@@ -257,8 +276,7 @@ def run_stage_3(agent, ctx: RunContext, config: AnalysisConfig, lit_text: str) -
         return cached
     print("[Stage 3] Writing report...", flush=True)
     prompt = _build_report_prompt(config, lit_text)
-    usage_raw, raw = _go_with_retry(agent, prompt)
-    ctx.accumulate_usage(usage_raw)
+    _, raw = _go_with_retry(agent, prompt)
     result = extract_solution(raw)
     ctx.save_cached("report", key, result)
     ctx.save_stage("03_report.md", result)
@@ -351,7 +369,7 @@ def run_pipeline(config: AnalysisConfig):
             sample = "\n".join(lines[:50])
         generate_stage_prompts(config, sample)
 
-    agent = create_cached_agent(config)
+    agent = create_cached_agent(config, ctx)
 
     analysis_text = run_stage_1(agent, ctx, config)
     lit_text = run_stage_2(agent, ctx, config)
