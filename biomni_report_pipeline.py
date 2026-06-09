@@ -9,6 +9,7 @@ import json
 import os
 import re
 import sys
+import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -88,6 +89,19 @@ class RunContext:
         (self.run_dir / "00_metadata.json").write_text(
             json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8"
         )
+
+
+def _go_with_retry(agent, prompt: str, max_retries: int = 4):
+    for attempt in range(max_retries):
+        try:
+            return agent.go(prompt)
+        except Exception as e:
+            if "rate_limit" in str(e).lower() and attempt < max_retries - 1:
+                wait = 60 * (attempt + 1)
+                print(f"[Rate limit] Waiting {wait}s before retry {attempt + 2}/{max_retries}...", flush=True)
+                time.sleep(wait)
+            else:
+                raise
 
 
 def create_cached_agent(config: AnalysisConfig):
@@ -191,13 +205,14 @@ def run_stage_1(agent, ctx: RunContext, config: AnalysisConfig) -> str:
 
 
 def run_stage_2(agent, ctx: RunContext, config: AnalysisConfig) -> str:
-    key = ctx.compute_hash([(config.literature_prompt or "").encode(), config.llm_model.encode()])
+    # llm_model excluded: PubMed search results are model-independent
+    key = ctx.compute_hash([(config.literature_prompt or "").encode()])
     if cached := ctx.load_cached("literature", key):
         print("[CACHE HIT] Stage 2: literature", flush=True)
         ctx.save_stage("02_literature.md", cached)
         return cached
     print("[Stage 2] Searching literature...", flush=True)
-    usage_raw, raw = agent.go(config.literature_prompt)
+    usage_raw, raw = _go_with_retry(agent, config.literature_prompt)
     ctx.accumulate_usage(usage_raw)
     result = extract_solution(raw)
     ctx.save_cached("literature", key, result)
@@ -230,14 +245,19 @@ ADDITIONAL RULES:
 
 
 def run_stage_3(agent, ctx: RunContext, config: AnalysisConfig, lit_text: str) -> str:
-    key = ctx.compute_hash([ctx.csv_bytes, lit_text.encode(), config.llm_model.encode()])
+    key = ctx.compute_hash([
+        ctx.csv_bytes,
+        lit_text.encode(),
+        config.llm_model.encode(),
+        (config.report_instructions or "").encode(),
+    ])
     if cached := ctx.load_cached("report", key):
         print("[CACHE HIT] Stage 3: report", flush=True)
         ctx.save_stage("03_report.md", cached)
         return cached
     print("[Stage 3] Writing report...", flush=True)
     prompt = _build_report_prompt(config, lit_text)
-    usage_raw, raw = agent.go(prompt)
+    usage_raw, raw = _go_with_retry(agent, prompt)
     ctx.accumulate_usage(usage_raw)
     result = extract_solution(raw)
     ctx.save_cached("report", key, result)
