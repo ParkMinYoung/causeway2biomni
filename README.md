@@ -1,10 +1,26 @@
-# Biomin Report Pipeline
+# Biomni Report Pipeline
 
-Biomni A1 에이전트 기반 생물정보학 분석 리포트 자동 생성 파이프라인.
+Biomni A1 에이전트 기반 분석 리포트 자동 생성 에이전트. 사용자로부터 **결과 파일 + 분석 목적**을
+받아, 연구자 관점(가설→증명→설명→결론)의 문헌 근거 기반 리포트를 작성한다.
+
+## 파이프라인 단계 (연구자 워크플로우)
+
+| 단계 | 이름 | 역할 | 충족 요구사항 |
+|------|------|------|---------------|
+| 0 | Context Build | 결과·목적으로부터 최적 프롬프트 자동 생성 | 최적 context build |
+| 1 | Analysis | 통계 분석 + 전문가 verdict | 결과 분석 |
+| 2 | Literature | 다중 GATE 문헌 검색 (DOI·방향성·기전 수집) | 여러 문헌 reference support |
+| 3 | Report Draft | 연구자 관점 리포트 (가설→증거→**기전·방향성 일치**→설명→결론 + 용어 설명) | 최적 리포트 형식 / 용어 설명 |
+| 4 | Review & Optimize | 수치·인용·기전 일치 재검토 후 최종본 산출 | 결과 재검토 및 최적화 |
 
 ## 특징
 
-- **3단계 파이프라인**: 통계 분석 → 문헌 검색 → 리포트 생성 (Markdown + PDF)
+- **5단계 파이프라인**: context build → 통계 분석 → 문헌 검색 → 리포트 초안 → 자체 검토·최적화
+- **결과↔문헌 일치 체크**: 핵심 결과마다 방향성·기전을 문헌과 대조하여
+  `CONSISTENT / PARTIALLY CONSISTENT / INCONSISTENT / NO PRIOR EVIDENCE` verdict 명시
+- **연구자 관점 서술**: 가설(Hypothesis) → 증거(Evidence) → 기전·방향성 일치 → 설명 → 결론
+- **용어 설명(Glossary)**: 사용된 모든 약어·통계·기법을 비전문가용 한 줄 설명으로 자동 첨부
+- **자체 검토(Stage 4)**: 초안의 수치·인용·기전 일치·논리 흐름을 재검토하고 최적화된 최종본 생성
 - **디스크 캐시**: 동일 입력 재실행 시 API 호출 없이 캐시에서 즉시 반환
 - **API 프롬프트 캐싱**: 42K 토큰 시스템 프롬프트를 `cache_control: ephemeral`로 캐시 (~$3.3/회 절감)
 - **결과 보존**: 타임스탬프 디렉토리로 이전 실행 결과 덮어쓰기 없음
@@ -36,9 +52,11 @@ result/
 │   ├── 00_metadata.json
 │   ├── 01_analysis.md             # Stage 1: MR 통계 분석
 │   ├── 02_literature.md           # Stage 2: PubMed 문헌 검색
-│   ├── 03_report.md               # Stage 3: 최종 리포트
+│   ├── 03_report.md               # Stage 3: 리포트 초안
+│   ├── 04_review.md               # Stage 4: 검토 노트 + 최종본 원본
+│   ├── 04_report.md               # Stage 4: 최종 리포트 (PDF 소스)
 │   └── causeway_mr_report.pdf
-├── report.md -> [latest]/03_report.md
+├── report.md -> [latest]/04_report.md     # 검토 비활성 시 03_report.md
 └── causeway_mr_report.pdf -> [latest]/...
 ```
 
@@ -72,10 +90,18 @@ config = AnalysisConfig(
     literature_prompt=LITERATURE_SEARCH_PROMPT,
     report_instructions=REPORT_INSTRUCTIONS,
     csv_path=Path("data/results.csv"),
+    # 선택 (기본값 사용 가능):
+    review=True,                 # Stage 4 자체 검토·최적화 (기본 True)
+    glossary=True,               # 용어 설명 섹션 자동 첨부 (기본 True)
+    # report_structure=None,     # 연구자 관점 논리 흐름 커스텀 시 지정
+    # no_citation_fallback="...",# 문헌 0건일 때 [A*] 인용 대신 넣을 문장
 )
 
 run_pipeline(config)
 ```
+
+`analysis_prompt` 등을 `None`으로 두면 Stage 0가 분석 목적과 샘플 데이터로부터
+세 프롬프트(분석/문헌/리포트)를 자동 생성한다.
 
 ## 파이프라인 구조
 
@@ -94,7 +120,7 @@ docs/design.md              # 설계 문서
 |------|------|
 | 첫 실행 | 전체 API 호출, 결과를 `.cache/`에 저장 |
 | 동일 CSV 재실행 | 모든 스테이지 `[CACHE HIT]`, API 호출 없음 |
-| CSV 변경 후 재실행 | Stage 1,3 재실행 (Stage 2 문헌 검색은 캐시 유지) |
+| CSV 변경 후 재실행 | Stage 1,3,4 재실행 (Stage 2 문헌 검색은 캐시 유지) |
 | 프롬프트 수정 후 재실행 | 해당 스테이지 이후만 재실행 |
 
 캐시 초기화: `rm -rf result/.cache/`

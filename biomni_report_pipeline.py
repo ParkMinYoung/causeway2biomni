@@ -32,6 +32,16 @@ class AnalysisConfig:
     literature_prompt: str | None = None
     report_instructions: str | None = None
     csv_path: Path | None = None
+    # --- report quality controls (generic, analysis-agnostic) ---
+    report_structure: str | None = None     # override the researcher-perspective scaffold
+    glossary: bool = True                    # append a "용어 설명 (Glossary)" section
+    review: bool = True                      # run Stage 4 self-review & optimization
+    # Sentence used when the gated literature search yields zero qualifying papers,
+    # so the report never fabricates an [A*] citation.
+    no_citation_fallback: str = (
+        "No qualifying population/method-specific study was identified "
+        "in the gated literature search."
+    )
 
 
 PRICE_PER_TOKEN = {
@@ -177,18 +187,25 @@ Sample data (first rows):
 
 Generate:
 1. analysis_prompt: Detailed prompt instructing biomni to perform statistical analysis of the data.
-   Must include Tasks 1-7 with Task 7 using this REQUIRED FORMAT:
+   Reference the actual column names. Must include Tasks 1-7 with Task 7 using this REQUIRED FORMAT:
    VERDICT: [STRONG/MODERATE/WEAK/INSUFFICIENT]
    RATIONALE (2-3 sentences): ...
    MAIN_CAVEAT: ...
 
 2. literature_prompt: PubMed search prompt with 3-4 targeted searches.
    Each search must include a GATE filter: specific inclusion criteria and explicit rejection list.
+   For each qualifying paper the reporting format must capture BOTH the effect DIRECTION and the
+   proposed biological MECHANISM, so the report can later judge result-vs-literature agreement.
    Format: query_pubmed() calls + GATE criteria + reporting format with DOI required.
+   Final line: "Do NOT fabricate citations."
 
-3. report_instructions: Rules for the final report.
-   Must include: title ≤8 words, citations only from verified DOIs in literature results,
-   numerical values must match analysis output exactly.
+3. report_instructions: Rules for the final report, written from a researcher's perspective.
+   Must require the reasoning chain 가설(Hypothesis) → 증거(Evidence) → 기전·방향성 일치
+   (Mechanism & Direction consistency, with an explicit CONSISTENT/PARTIALLY CONSISTENT/
+   INCONSISTENT/NO PRIOR EVIDENCE verdict per finding) → 설명(Explanation) → 결론(Conclusion).
+   Must include: title ≤8 words; citations only from verified DOIs in literature results;
+   numerical values must match analysis output exactly; a final 용어 설명 (Glossary) section
+   defining every method and abbreviation in plain language.
 
 Return JSON only, no markdown fences."""
 
@@ -239,15 +256,44 @@ def run_stage_2(agent, ctx: RunContext, config: AnalysisConfig) -> str:
     return result
 
 
+# Researcher-perspective reasoning chain enforced on every report unless a
+# config-specific structure overrides it. Language of prose is governed by
+# config.report_instructions; this scaffold only fixes the *logical* flow.
+DEFAULT_RESEARCHER_FRAMING = """\
+RESEARCHER-PERSPECTIVE STRUCTURE (필수 논리 흐름):
+Write the report from a researcher's standpoint. The narrative MUST follow this
+reasoning chain, and every quantitative claim must be traceable to the analysis output:
+  1. 가설 (Hypothesis): State the testable hypothesis implied by the analysis purpose.
+  2. 증거/증명 (Evidence): Present the results that test the hypothesis — effect sizes,
+     CIs, p-values, sensitivity analyses — in tables. No claim without a number.
+  3. 기전·방향성 일치 (Mechanism & Direction Consistency): For EACH key finding, state
+     whether its DIRECTION and biological MECHANISM agree with the cited literature,
+     using an explicit verdict — CONSISTENT / PARTIALLY CONSISTENT / INCONSISTENT /
+     NO PRIOR EVIDENCE — and name the supporting reference for that verdict.
+  4. 설명 (Explanation): Interpret why the results look as they do, integrating
+     mechanism, heterogeneity, and study limitations.
+  5. 결론 (Conclusion): Derive the conclusion that follows from evidence + mechanism,
+     and state an explicit confidence level (strong / moderate / weak / insufficient).
+"""
+
+
 def _build_report_prompt(config: AnalysisConfig, lit_text: str) -> str:
-    import re
     verified_dois = re.findall(r"doi:\S+", lit_text, re.IGNORECASE)
     n = len(verified_dois)
     citation_rule = (
-        f"[A*] citations: use ONLY the {n} verified references ([A1]–[A{n}])."
+        f"[A*] citations: use ONLY the {n} verified references ([A1]–[A{n}]) "
+        "that appear in the literature results above."
         if n > 0
-        else "[A*] citation format is FORBIDDEN — no verified East-Asian-specific MR papers found. "
-             "Replace with: 'No large-scale East-Asian-specific MR study identified.'"
+        else "[A*] citation format is FORBIDDEN — no reference passed the literature gate. "
+             f"Replace any such citation with: '{config.no_citation_fallback}'"
+    )
+    framing = config.report_structure or DEFAULT_RESEARCHER_FRAMING
+    glossary_rule = (
+        "4. 용어 설명 (Glossary): End the report with a Glossary section that defines, in one "
+        "plain-language line each, every method name, statistic, and abbreviation used "
+        "(written for a non-specialist reader)."
+        if config.glossary
+        else ""
     )
 
     return f"""{config.report_instructions or ''}
@@ -259,8 +305,9 @@ ADDITIONAL RULES:
 1. Title: ≤8 words.
 2. {citation_rule}
 3. All numerical values must match the analysis output exactly (±0.001 tolerance).
-4. Structure: Abstract → Methods Summary → Results → Discussion → References
-"""
+{glossary_rule}
+
+{framing}"""
 
 
 def run_stage_3(agent, ctx: RunContext, config: AnalysisConfig, lit_text: str) -> str:
@@ -274,13 +321,68 @@ def run_stage_3(agent, ctx: RunContext, config: AnalysisConfig, lit_text: str) -
         print("[CACHE HIT] Stage 3: report", flush=True)
         ctx.save_stage("03_report.md", cached)
         return cached
-    print("[Stage 3] Writing report...", flush=True)
+    print("[Stage 3] Writing report draft...", flush=True)
     prompt = _build_report_prompt(config, lit_text)
     _, raw = _go_with_retry(agent, prompt)
     result = extract_solution(raw)
     ctx.save_cached("report", key, result)
     ctx.save_stage("03_report.md", result)
     return result
+
+
+def _build_review_prompt(config: AnalysisConfig, draft: str, analysis_text: str, lit_text: str) -> str:
+    return f"""You are a critical peer reviewer and scientific editor. Re-examine the DRAFT
+REPORT below against the ANALYSIS OUTPUT and the LITERATURE RESULTS, then produce an
+optimized, corrected final version.
+
+Run every check and FIX the issues in place:
+1. Numerical fidelity — every number in the report must match the ANALYSIS OUTPUT exactly
+   (±0.001). Correct any mismatch; never invent a value.
+2. Citation validity — every [A*] citation must map to a DOI present in the LITERATURE
+   RESULTS. Remove or replace invalid/fabricated citations.
+3. Mechanism & direction consistency — confirm each CONSISTENT / PARTIALLY CONSISTENT /
+   INCONSISTENT / NO PRIOR EVIDENCE verdict is actually supported by the named reference;
+   downgrade any overstatement.
+4. Logical chain — ensure 가설 → 증거 → 기전 → 설명 → 결론 flows with no unsupported leaps;
+   the stated confidence level must match the strength of the evidence.
+5. Glossary completeness — every abbreviation, statistic, and method used must be defined.
+6. Clarity & concision — tighten wording, remove redundancy, keep the title ≤8 words.
+
+ANALYSIS OUTPUT:
+{analysis_text}
+
+LITERATURE RESULTS:
+{lit_text}
+
+DRAFT REPORT:
+{draft}
+
+Output EXACTLY two parts:
+PART A — REVIEW NOTES: a short bullet list of issues found and how each was fixed.
+PART B — FINAL REPORT: the complete corrected report in markdown, wrapped in
+<solution>...</solution>."""
+
+
+def run_stage_4(agent, ctx: RunContext, config: AnalysisConfig,
+                draft: str, analysis_text: str, lit_text: str) -> str:
+    key = ctx.compute_hash([
+        draft.encode(),
+        analysis_text.encode(),
+        lit_text.encode(),
+        config.llm_model.encode(),
+    ])
+    if cached := ctx.load_cached("review", key):
+        print("[CACHE HIT] Stage 4: review", flush=True)
+        ctx.save_stage("04_report.md", cached)
+        return cached
+    print("[Stage 4] Reviewing & optimizing report...", flush=True)
+    prompt = _build_review_prompt(config, draft, analysis_text, lit_text)
+    _, raw = _go_with_retry(agent, prompt)
+    ctx.save_stage("04_review.md", raw)        # full review notes + final report
+    final = extract_solution(raw)
+    ctx.save_cached("review", key, final)
+    ctx.save_stage("04_report.md", final)
+    return final
 
 
 _HTML_TEMPLATE = """<!DOCTYPE html>
@@ -339,9 +441,10 @@ def render_pdf(report_md_path: Path, output_path: Path, title: str):
         print(f"[render_pdf] WeasyPrint error ({e}) — HTML saved to {html_path}", file=sys.stderr)
 
 
-def update_symlinks(output_base: Path, run_dir: Path, name: str):
+def update_symlinks(output_base: Path, run_dir: Path, name: str,
+                    final_md: Path | None = None):
     pairs = [
-        ("report.md", run_dir / "03_report.md"),
+        ("report.md", final_md or run_dir / "03_report.md"),
         (f"{name}_report.pdf", run_dir / f"{name}_report.pdf"),
         (f"{name}_report.html", run_dir / f"{name}_report.html"),
     ]
@@ -373,10 +476,16 @@ def run_pipeline(config: AnalysisConfig):
 
     analysis_text = run_stage_1(agent, ctx, config)
     lit_text = run_stage_2(agent, ctx, config)
-    run_stage_3(agent, ctx, config, lit_text)
+    draft = run_stage_3(agent, ctx, config, lit_text)
+
+    if config.review:
+        run_stage_4(agent, ctx, config, draft, analysis_text, lit_text)
+        final_md = ctx.run_dir / "04_report.md"
+    else:
+        final_md = ctx.run_dir / "03_report.md"
 
     pdf_path = ctx.run_dir / f"{config.name}_report.pdf"
-    render_pdf(ctx.run_dir / "03_report.md", pdf_path, config.pdf_title)
+    render_pdf(final_md, pdf_path, config.pdf_title)
 
     elapsed = (datetime.now() - t0).total_seconds()
     cost = compute_cost(ctx.usage)
@@ -392,10 +501,11 @@ def run_pipeline(config: AnalysisConfig):
         "analysis": config.name,
         "model": config.llm_model,
         "elapsed_sec": round(elapsed, 1),
-        "stages_cached": [],
+        "review_enabled": config.review,
+        "final_report": final_md.name,
         "token_usage": ctx.usage,
         "estimated_cost_usd": round(cost, 4),
     })
 
-    update_symlinks(config.output_base, ctx.run_dir, config.name)
+    update_symlinks(config.output_base, ctx.run_dir, config.name, final_md)
     print(f"\n[Pipeline] Done in {elapsed:.0f}s → {ctx.run_dir}", flush=True)

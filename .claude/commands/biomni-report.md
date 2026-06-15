@@ -4,10 +4,12 @@ Run this command to set up and execute a new biomni analysis report pipeline.
 
 ## What this command does
 
-1. Reads the user's analysis purpose and data files
-2. Generates stage-specific prompts (analysis → literature → report)
+1. Reads the user's analysis purpose and data files (결과 파일 + 분석 목적)
+2. Builds optimal context — generates stage-specific prompts (analysis → literature → report)
 3. Creates `analyses/<name>.py` with the generated config
-4. Runs the full pipeline producing markdown + PDF output
+4. Runs the full pipeline: statistical analysis → multi-reference literature search with
+   result-vs-literature direction & mechanism consistency check → researcher-perspective
+   report (가설→증거→기전→설명→결론 + 용어 설명) → self-review & optimization → markdown + PDF
 
 ## Steps
 
@@ -46,7 +48,8 @@ Based on your understanding, write:
 **LITERATURE_SEARCH_PROMPT**: PubMed search instructions.
 - 3–4 targeted searches using `query_pubmed()`
 - Each search has a GATE filter: explicit inclusion criteria + explicit REJECT list for off-topic papers
-- Reporting format must require DOI for every cited paper
+- Reporting format must require DOI for every cited paper AND capture both the effect
+  DIRECTION and the proposed biological MECHANISM (so the report can later judge agreement)
 - Final instruction: "Do NOT fabricate citations."
 
 **REPORT_INSTRUCTIONS**: Rules for the final report (Korean body text).
@@ -56,6 +59,13 @@ Based on your understanding, write:
 - Citations: use only DOIs verified in the literature results
 - Numerical values must match analysis output exactly (±0.001)
 - Required sections: 초록 → 서론 → 방법 요약 → 결과 → 고찰 → 결론 → 참고문헌
+- Researcher-perspective reasoning chain and 용어 설명 (Glossary) are appended automatically by
+  the engine (`DEFAULT_RESEARCHER_FRAMING`); set `report_structure`/`glossary=False` only to override.
+  No need to restate them here.
+
+> The engine runs **Stage 4 (self-review & optimization)** automatically: it re-checks every
+> number against the analysis, validates citations, verifies each mechanism/direction verdict,
+> and rewrites the draft into the final `04_report.md`. Disable with `review=False` if not wanted.
 
 ### Step 4: Create the analysis file
 

@@ -84,6 +84,7 @@ For each paper passing its gate:
 - Ancestry and N (exposure and outcome separately)
 - Key OR/beta (95% CI) for CAD
 - Direction vs European populations (same / opposite / not compared)
+- Proposed MECHANISM linking the lipid trait to CAD (1 line, as stated by the paper)
 - Gate criterion satisfied: [quote the specific criterion met]
 Do NOT alter numbers. If CI not in abstract, state "CI not reported."
 """
@@ -138,6 +139,7 @@ def main():
         literature_prompt=LITERATURE_SEARCH_PROMPT,
         report_instructions=REPORT_INSTRUCTIONS,
         csv_path=csv_path,
+        no_citation_fallback="동아시아 집단 특이적 대규모 MR 연구 미발견 (No large-scale East-Asian-specific MR study identified).",
     )
 
     run_pipeline(config)
